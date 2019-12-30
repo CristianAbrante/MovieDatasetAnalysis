@@ -1,0 +1,95 @@
+---
+title: "hands-on-1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+# It is necessary to set the working directory to 
+# the project directory location.
+
+# Install the required packages if needed.
+if (!require("tm"))
+  install.packages("tm")
+if (!require("ggplot2"))
+  install.packages("ggplot2")
+if (!require("wordcloud"))
+  install.packages("wordcloud")
+if (!require("RWeka"))
+  install.packages("RWeka")
+if (!require("reshape2"))
+  install.packages("reshape2")
+
+# Load the required libraries.
+library(tm)
+library(ggplot2)
+library(wordcloud)
+library(RWeka)
+library(reshape2)
+```
+
+## Corpus load
+
+We load the dataset from the folder `data`:
+
+```{r corpus}
+source.pos = DirSource("./data/txt_sentoken/pos", encoding = "UTF-8")
+corpus = Corpus(source.pos)
+```
+
+## Inspect corpus
+
+Home many lines there are in the corpus.
+
+```{r corpus-lines}
+length(corpus)
+```
+
+Also we can see a summary of the corpus.
+```{r corpus-summary}
+summary(corpus[1:3])
+inspect(corpus[1])
+```
+
+We can also inspect the metadata of the corpus
+```{r corpus-metadata}
+meta(corpus[[1]])
+meta(corpus[[1]])$id
+```
+
+## Creating a rext document matrix.
+
+```{r corpus-tdm}
+tdm = TermDocumentMatrix(corpus)
+tdm
+inspect(tdm[2000:2003,100:103])
+length(dimnames(tdm)$Terms)
+freq=rowSums(as.matrix(tdm))
+head(freq,10)
+tail(freq,10)
+plot(sort(freq, decreasing = T),col="blue",main="Word frequencies", xlab="Frequency-based rank", ylab = "Frequency")
+tail(sort(freq),n=10) ## Ten most frequent terns
+sum(freq == 1) # Terms which only appear once.
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
