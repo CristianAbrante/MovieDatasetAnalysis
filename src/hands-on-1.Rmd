@@ -73,7 +73,11 @@ sum(freq == 1) # Terms which only appear once.
 ```
 
 
+## Appliying transformations to corpus
 
+```{r corpus-tdm}
+getTransformations()
+```
 
 
 

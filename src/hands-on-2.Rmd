@@ -1,0 +1,193 @@
+---
+title: "Hands on 2"
+author: "Cristian Abrante"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(rJava)
+.jinit(parameters="-Xmx4g")
+library(NLP)
+library(openNLP) 
+library(openNLPmodels.en)
+library(tm)
+```
+
+## Objectives
+
+The objective of this hands-on homework is to measure the performance of the text classifier, based on two metrics: *precision* and *recall*.
+
+## Auxiliary functions
+
+For this exercise, we are going to use this auxiliary function, which annotates the document passed, using sentence, word and POS token annotation.
+
+```{r auxiliary-1}
+getAnnotationsFromDocument = function(doc) {
+  x <- as.String(doc)
+  sent_token_annotator <- Maxent_Sent_Token_Annotator()
+  word_token_annotator <- Maxent_Word_Token_Annotator()
+  pos_tag_annotator <- Maxent_POS_Tag_Annotator()
+  y1 <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
+  y2 <- NLP::annotate(x, pos_tag_annotator, y1)
+  gc()
+  parse_annotator <- Parse_Annotator()
+  y3 <- NLP::annotate(x, parse_annotator, y2)
+  return(y3)  
+}
+```
+
+Also, we are going to use this auxiliary function for creating a `PlainTextDocument` from the document and the annotations.
+
+```{r auxiliary-2}
+getAnnotatedPlainTextDocument = function(doc,annotations){
+  x=as.String(doc)
+  a = AnnotatedPlainTextDocument(x,annotations)
+  return(a)  
+} 
+```
+
+## Load corpus and document
+
+For this exercise we must first load the corpus from the directory.
+
+```{r corpus-load}
+source.pos = DirSource("./data/txt_sentoken/pos/", encoding = "UTF-8")
+corpus = Corpus(source.pos)
+```
+
+We must select the document from this corpus which matches the last three numbers of my personal identification number (`508`)
+
+```{r document}
+id_number = 508
+index = id_number + 1
+
+document = corpus[[index]]
+inspect(document)
+```
+
+## Sentences selected
+
+We are going then to calculate the annotations of the selected document. Then we are going to select the first two sentences, which are the ones that we are going to calculate the precision and recall metrics for.
+
+```{r annotations}
+annotations = lapply(document, getAnnotationsFromDocument)
+
+corpus.tagged = Map(getAnnotatedPlainTextDocument, document, annotations)
+annotated_document = corpus.tagged[[1]]
+
+# Number of sentences that we are selecting.
+number_of_sentences = 2
+
+head(sents(annotated_document), number_of_sentences)
+```
+
+We can also see which are the calculated tags for each word of the sentence.
+
+```{r tagged-annotations}
+head(head(tagged_sents(annotated_document), number_of_sentences))
+```
+
+## Manual analisys of sentences
+
+For comparing the manual analisys of the sentence with the calculated result from the system we are going to construct a table, and from this information, we are going to calculate the metrics.
+
+First, we are going to analize the sentence: `maybe the most important thing about this movie is that it's not handled like the hallmark hall of fame movie of the month , because it very well could have been a manipulative tearjerker , broadcasted on abc on a monday night , starring kelly martin and yasmeen bleeth , respectively`:
+
+
+|     Word     | Calculated Token | Real Token |
+|:------------:|:----------------:|:----------:|
+|     maybe    |        RB        |     RB     |
+|      the     |        DT        |     DT     |
+|     most     |        RBS       |     RBS    |
+|   important  |        JJ        |     JJS    |
+|     thing    |        NN        |     NN     |
+|     about    |        IN        |     IN     |
+|     this     |        DT        |     DT     |
+|     movie    |        NN        |     NN     |
+|      is      |        VBZ       |     VBZ    |
+|     that     |        IN        |     IN     |
+|      it      |        PRP       |     PRP    |
+|      's      |        VBZ       |     VBZ    |
+|      not     |        RB        |     RB     |
+|    handled   |        VBN       |     VBN    |
+|     like     |        IN        |     IN     |
+|      the     |        DT        |     DT     |
+|   hallmark   |        NN        |     NN     |
+|     hall     |        NN        |     NN     |
+|      of      |        IN        |     IN     |
+|     fame     |        NN        |     NN     |
+|     movie    |        NN        |     NN     |
+|      of      |        IN        |     IN     |
+|      the     |        DT        |     DT     |
+|     month    |        NN        |     NN     |
+|       ,      |         ,        |      ,     |
+|    because   |        IN        |     IN     |
+|      it      |        PRP       |     PRP    |
+|     very     |        RB        |     RB     |
+|     well     |        RB        |     RB     |
+|     could    |        MD        |     MD     |
+|     have     |        VB        |     VB     |
+|     been     |        VBN       |     VBN    |
+|       a      |        DT        |     DT     |
+| manipulative |        JJ        |     JJ     |
+|  tearjerker  |        NN        |     NN     |
+|       ,      |         ,        |      ,     |
+|  broadcasted |        VBD       |     VBD    |
+|      on      |        IN        |     IN     |
+|      abc     |        NN        |     NN     |
+|      on      |        IN        |     IN     |
+|       a      |        DT        |     DT     |
+|    monday    |        JJ        |     NN     |
+|     night    |        NN        |     NN     |
+|       ,      |         ,        |      ,     |
+|   starring   |        VBG       |     VBG    |
+|     kelly    |        NN        |     NN     |
+|    martin    |        NN        |     NN     |
+|      and     |        CC        |     CC     |
+|    yasmeen   |        NN        |     NN     |
+|    bleeth    |        VBP       |     NN     |
+|       ,      |         ,        |      ,     |
+| respectively |        RB        |     RB     |
+
+The, we are going to analize the second sentence; `because it's not handled like the greatest story ever told is precisely why it's so great`:
+
+|    Word   | Calculated Token | Real Token |
+|:---------:|:----------------:|:----------:|
+|  because  |        IN        |     IN     |
+|     it    |        PRP       |     PRP    |
+|     's    |        VBZ       |     VBZ    |
+|    not    |        RB        |     RB     |
+|  handled  |        VBN       |     VBN    |
+|    like   |        IN        |     IN     |
+|    the    |        DT        |     DT     |
+|  greatest |        JJS       |     JJS    |
+|   story   |        NN        |     NN     |
+|    ever   |        RB        |     RB     |
+|    told   |        VBN       |     VBN    |
+|     is    |        VBZ       |     VBZ    |
+| precisely |        RB        |     RB     |
+|    why    |        WRB       |     WRB    |
+|     it    |        PRP       |     PRP    |
+|     `s    |        VBZ       |     VBZ    |
+|     so    |        RB        |     RB     |
+|   great   |        JJ        |     JJ     |
+
+## Metrics and conclusions
+
+After having constructed the tables with the taggs, we can calculate the two metrics: `precision` and `recall` for each sentence.
+
+We can define the `precision` as the number of correct tokens selected, divided by the number of tokens of the sentence, and the `recall` as the number of correct tokens, divided by the number of tokens of the text.
+
+* *First sentence*:
+  * `precision = 51 / 53 = 0.9622642`
+* *Second sentence*:
+  * `precision = 19 / 19 = 1.00`
+
+Then, we calculate the recall for the two sentences:
+
+`recall = 51 + 19 / 53 + 19 = 70 / 72 = 0.9722222`
+
+As we can see, we obtained a very hight result in recall. In general the tagging process was correct, despite some errors with with nouns in the days of the week (`monday`) and the surname of an actress (`Bleeth`) in the first sentence. 
+
+It is remarkable the performance in the second sentence, but maybe the reason is the small length with only 19 tokens compared with the 53 of the first sentence.
