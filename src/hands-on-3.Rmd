@@ -1,0 +1,100 @@
+---
+title: "Hands on 3"
+author: "Cristian Abrante"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(rJava)
+.jinit(parameters="-Xmx4g")
+# If there are more memory problems, invoke gc() after the POS tagging
+
+library(NLP) 
+library(openNLP) 
+library(openNLPmodels.en)
+library(tm)
+library(stringr)
+
+source("./hands-on-3-utils.R")
+```
+
+## Objectives
+
+The objective of this hands-on homework is to create a pattern composed of regular expression which is able to recognize the names of actors, directors and celebrities which appear in a dataset of film reviews.
+
+## Load corpus and tagging
+
+First of all, we are going to load the dataset of study, and then we are going to apply a tagging procedure in order to incorporate the tags into the patterns and improve the precision of the results.
+
+We have decided to take a subset of the original dataset of reviews in order to improve the performance of doing the process of annotation.
+
+```{r load}
+source.pos = DirSource("./data/txt_sentoken/subset/", encoding = "UTF-8")
+corpus = Corpus(source.pos)
+annotations = lapply(corpus, getAnnotationsFromDocument)
+corpus.taggedText = Map(getAnnotatedMergedDocument, corpus, annotations)
+```
+
+## Patterns
+
+Appart from the 6 patters which were included with the exercise, we are going to define three aditional patterns in order to imporve the results.
+
+```{r patterns}
+pattern=c("created/VBN by/IN ([A-z]*)/NN ([A-z]*)/NN")
+pattern=c(pattern,"created/VBN by/IN [A-z]*/NN [A-z]*/NN \\(/-LRB- and/CC ([A-z]*)/JJ ([A-z]*)/NN")
+pattern=c(pattern,"screenwriter[s]?/NN[S]? ([A-z]*)/(?:NN[S]?|JJ) ([A-z]*)/(?:NN|JJ)")
+pattern=c(pattern,"cinematographer/NN(?: ,/,)? ([A-z]*)/NN ([A-z]*)/NN")
+pattern=c(pattern,"cinematographer/NN(?: ,/,)? ([A-z]*)/NN ([A-z]*)/IN ([A-z]*)/NN")
+pattern=c(pattern,"oscar/NN winner/NN ([A-z]*)/VBG ([A-z]*)/NNS")
+pattern=c(pattern,"\\(/-LRB- ([A-z]*)/...? ([A-z]*)/...? ?.*? \\)/-RRB-")
+pattern=c(pattern,"of/...? a/...? ([A-z]*)/...? ([A-z]*)/...?")
+pattern=c(pattern,"([A-z]*)/...?'s")
+
+# We define the entities by appliying the pattern.
+allEntities = detectPatternsInTaggedCorpus(corpus, corpus.taggedText, pattern)
+allEntities[!is.na(allEntities[4]),c(1,4)]
+```
+
+The three additional patterns are:
+
+* `\\(/-LRB- ([A-z]*)/...? ([A-z]*)/...? ?.*? \\)/-RRB-`: This pattern is used to detect the name of the actor which plays in a movie. It is a common practise when discribing the plot of a movie to put the name of the actor or actress between parenthesis. For example: `The amazing spiderman (Tom Holland) have to save the city.`
+
+* `of/...? a/...? ([A-z]*)/...? ([A-z]*)/...?`: This pattern is used to describe a common formula when refered to actors. For example: `of a robert redford or paul newman`-
+
+* `([A-z]*)/...?'s`: This pattern tries to recognize possesion or authorship. For example: `Hitchcock's movies`.
+
+## Performance of patterns
+
+We are going to see how many matches per column have achieved each pattern in order to test their performance.
+
+```{r patterns-performance}
+entityCountPerPattern = countMatchesPerColumn(allEntities)
+entityCountPerPattern
+
+hist(entityCountPerPattern$Count)
+```
+
+As we can see the new introduced patters have a good performance, having 47, 24 and 46 matches in total respectively.
+
+ALso, we can see that according to the number of matches, the patter which have performed the best is the last one, with 47 matches, and the one which have performed worst is the fifth one with zero matches.
+
+## Metrics
+
+We are going to see the results of the metrics in order to test how well the model have performed. For doing this, we need to save a separate file and compare it with a GoldenStandard.
+
+```{r metrics}
+# Write result to a csv file
+write.table(allEntities, file = "allEntities.csv", row.names = F, na="", sep=";")
+allMatches = mergeAllMatchesInLists(allEntities)
+head(allMatches)
+
+goldStandard = read.table(file = "goldStandard.csv", quote = "", na.strings=c(""),
+                          colClasses="character", sep=";")
+allMatchesGold = mergeGoldStandardInLists(goldStandard)
+head(allMatchesGold$Matches)
+
+metrics = calculateMetrics(allMatches, allMatchesGold)
+metrics
+```
+
+We can see that the final metrics gives a precision of 0.3396, a recall of 0.1845 and an Fmeasure of 0.2391. We can see that the recall have a low result, as a future line for improving this metrics we can do a preprocessing for saving the results of the names and surnames, maybe with the information of the capital letters.
